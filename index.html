@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Rastreo DHL · Evidencias para tickets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">DHL</span>
+      <div>
+        <h1>Rastreo de envíos</h1>
+        <p>Consulta masiva y evidencias para tickets</p>
+      </div>
+    </div>
+    <button id="btnConfig" class="btn ghost">⚙️ Configuración</button>
+  </header>
+
+  <main class="container">
+    <!-- CONFIG -->
+    <section id="configPanel" class="card hidden">
+      <h2>Configuración</h2>
+      <p class="muted">Se guarda solo en este navegador (localStorage). Nada de esto se sube a GitHub.</p>
+      <div class="grid2">
+        <label>Modo de conexión
+          <select id="cfgMode">
+            <option value="proxy">Proxy Supabase (recomendado)</option>
+            <option value="direct">Directo a DHL (solo si DHL permite CORS)</option>
+            <option value="demo">Demo (datos de ejemplo)</option>
+          </select>
+        </label>
+        <label>Pausa entre consultas (ms)
+          <input id="cfgDelay" type="number" min="300" step="100" value="1200" />
+        </label>
+        <label class="proxyOnly">URL de la Edge Function
+          <input id="cfgProxyUrl" type="url" placeholder="https://xxxx.supabase.co/functions/v1/dhl-track" />
+        </label>
+        <label class="proxyOnly">Supabase anon key
+          <input id="cfgAnonKey" type="password" placeholder="eyJhbGciOi..." />
+        </label>
+        <label class="directOnly">DHL API Key
+          <input id="cfgApiKey" type="password" placeholder="Tu DHL-API-Key" />
+        </label>
+        <label>Idioma de eventos
+          <select id="cfgLang">
+            <option value="es">Español</option>
+            <option value="en">Inglés</option>
+          </select>
+        </label>
+      </div>
+      <div class="row gap">
+        <button id="btnSaveCfg" class="btn primary">Guardar</button>
+        <button id="btnTestCfg" class="btn">Probar conexión</button>
+        <span id="cfgMsg" class="muted"></span>
+      </div>
+    </section>
+
+    <!-- INPUT -->
+    <section class="card">
+      <h2>1. Cargar guías</h2>
+      <div class="grid2">
+        <div class="drop" id="dropZone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden />
+          <p><strong>Arrastra tu Excel aquí</strong> o <a href="#" id="pickFile">selecciónalo</a></p>
+          <p class="muted small">Detecta columnas TICKET, NO GUIA, CP DESTINO, PDV, CONTACTO, CD DESTINO, MENSAJERIA…</p>
+          <label class="check"><input type="checkbox" id="onlyDhl" checked /> Solo filas con mensajería DHL</label>
+        </div>
+        <div>
+          <label>O pega las guías (una por línea: <code>ticket, guía, cp</code>)
+            <textarea id="pasteBox" rows="6" placeholder="214710, 2390030985, 89510&#10;215288	3884398604	45400&#10;8261498453"></textarea>
+          </label>
+          <button id="btnAddPaste" class="btn">Agregar pegadas</button>
+        </div>
+      </div>
+      <p id="loadMsg" class="muted"></p>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="card">
+      <div class="row between wrap gap">
+        <h2>2. Consultar y exportar</h2>
+        <div class="row gap wrap">
+          <button id="btnRun" class="btn primary">▶ Consultar todas</button>
+          <button id="btnStop" class="btn hidden">⏹ Detener</button>
+          <button id="btnZip" class="btn">🗂 ZIP de capturas (PNG)</button>
+          <button id="btnXlsx" class="btn">📊 Resumen Excel</button>
+          <button id="btnClear" class="btn ghost">Limpiar</button>
+        </div>
+      </div>
+      <div class="progress hidden" id="progressWrap"><div id="progressBar"></div><span id="progressTxt"></span></div>
+      <div class="filters row gap wrap">
+        <input id="search" type="search" placeholder="Buscar ticket, guía, tienda…" />
+        <select id="statusFilter">
+          <option value="">Todos los estatus</option>
+          <option value="delivered">Entregado</option>
+          <option value="transit">En tránsito</option>
+          <option value="pre-transit">Pre-tránsito</option>
+          <option value="failure">Incidencia</option>
+          <option value="unknown">Desconocido</option>
+          <option value="error">Error de consulta</option>
+          <option value="pending">Sin consultar</option>
+        </select>
+        <span id="counters" class="muted small"></span>
+      </div>
+      <div class="tableWrap">
+        <table id="tbl">
+          <thead>
+            <tr><th>Ticket</th><th>Guía</th><th>CP</th><th>Tienda / Destino</th><th>Estatus</th><th>Último evento</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="emptyMsg" class="empty">Aún no hay guías cargadas.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL FICHA -->
+  <div id="modal" class="modal hidden">
+    <div class="modalBox">
+      <div class="row between gap wrap modalBar">
+        <strong id="modalTitle">Ficha</strong>
+        <div class="row gap wrap">
+          <button id="btnPng" class="btn primary">⬇ PNG</button>
+          <button id="btnPdf" class="btn">⬇ PDF</button>
+          <button id="btnCopy" class="btn">📋 Copiar imagen</button>
+          <button id="btnRefresh" class="btn">↻ Reconsultar</button>
+          <button id="btnClose" class="btn ghost">✕</button>
+        </div>
+      </div>
+      <div class="modalScroll"><div id="cardHost"></div></div>
+    </div>
+  </div>
+
+  <!-- Render oculto para exportación masiva -->
+  <div id="offscreen" aria-hidden="true"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
