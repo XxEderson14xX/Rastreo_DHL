@@ -88,7 +88,7 @@
     contacto: [/^CONTACTO/, /DESTINATARIO/],
     destino: [/^CD DESTINO/, /CIUDAD DESTINO/, /ESTADO DESTINO/],
     mensajeria: [/MENSAJERIA/, /PAQUETERIA/, /CARRIER/],
-    descripcion: [/^DESCRIPCION/],
+    descripcion: [/^DESCRIPCION/, /^EQUIPO/],
     modelo: [/^MODELO/],
     serie: [/^SERIE/]
   };
@@ -344,9 +344,9 @@
         ${cell('Equipo', [r.descripcion, r.modelo].filter(Boolean).join(' · '))}
         ${cell('Serie', r.serie)}
         ${cell('CP destino', r.cp)}
-        ${cell(delivered ? 'Recibió / firmó' : 'Entrega estimada', delivered ? x.signedBy : fmtDate(x.eta))}
+        ${delivered ? '' : cell('Entrega estimada', fmtDate(x.eta))}
         ${cell('Piezas', x.pieces)}
-        ${cell('Peso', x.weight)}
+        ${cell('Peso', x.weight || 'No disponible')}
       </div>
       ${!r.cp ? '<div class="f-warn" style="margin-top:12px">⚠️ Consulta sin código postal: DHL oculta parte del historial y el comprobante de entrega.</div>' : ''}
       <div class="f-sec">
@@ -432,8 +432,8 @@
       UBICACION: r.result?.lastLoc || '',
       ORIGEN: r.result?.origin || '', DESTINO: r.result?.destination || '',
       ENTREGA_ESTIMADA: fmtDate(r.result?.eta),
-      FIRMO: r.result?.signedBy || '',
-      PIEZAS: r.result?.pieces ?? '', PESO: r.result?.weight || '',
+      PIEZAS: r.result?.pieces ?? '',
+      PESO: r.result ? (r.result.weight || 'No disponible') : '',
       CONSULTADO: fmtDate(r.checkedAt)
     }));
     const ws = XLSX.utils.json_to_sheet(data);
